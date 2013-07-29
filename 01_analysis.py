@@ -113,32 +113,43 @@ def timeWindow(time, window, triggerID, Nchannels):
 				np.where(time < window[i] + dt + 0.5*np.diff(time)[0])[0][-1] + 1])
 			i += 1
 	return TW
-## Definition of 
+## Definition of background average value for each channel and frame. Zero
+## level depends on time in general for cases when the noise shape is
+## determined. Never successfully used in the analysis.
 def zeroLevelDefinition(V, TW):
-	if np.ndim(V) == 2:
+	if np.ndim(V) == 2:	# for one frame only
 		Nchannels, Npoints = np.shape(V)
 		m = np.zeros((Nchannels, Npoints))
 		for channel in range(Nchannels):
 			m[channel] = np.zeros(Npoints) + np.mean(V[channel, :TW[channel][0]-3*(TW[channel][1]-TW[channel][0])])
 		return m
+				# for multiple frames
 	Nchannels, Nframes, Npoints = np.shape(V)
 	m = np.zeros((Nchannels, Nframes, Npoints))
 	for frame in range(Nframes):
 		m[:, frame, :] = zeroLevelDefinition(V[:, frame, :], TW)
 	return m
-
+## Trigger ID and time windows definition. A user will see certain number of waveforms for each channel.
+## This number is defined in Nplots. The user will be able to zoom the graphs. When the plots is closed
+## the user will have to provide trigger ID and time windows for each channel. Trigger ID has to be an
+## integer number from 1 to Nchannels if trigger exists or less or equal to zero otherwise. For the time
+## windows the following sequence of numbers separated by comma has to be provided:
+## [tiT, tfT, dt, t1, t2, t3, ...], where tiT and tfT is initial and final time of trigger window,
+## dt is window width for signal channels (it must be the same for all channels), t1, t2, t3, ... are initial
+## time of windows for each signal channel. All times have to be in nsec.
 def parameterDefinition(time, data, command):
-	def subplotStructure(n):
+	def subplotStructure(n):	# returns a grid for plots
 		h = int(np.sqrt(float(n)))
 		d = n/h + (n % h != 0)
 		return 100*h + 10*d + 1
+	
 	Nchannels, Nframes, Npoints = np.shape(data)
 
-	if ('triggerID' not in command.keys()) or ('window' not in command.keys()):
+	if ('triggerID' not in command.keys()) or ('window' not in command.keys()):	# if one of the parameters is not defined
 		pl.figure()
 		for channel in range(Nchannels):
 			pl.subplot(subplotStructure(Nchannels) + channel)
-			pl.grid()
+			pl.grid(True)
 			pl.title(r'Channel \#' + str(channel+1), fontsize=fontsize['subtitle'])
 			for frame in range(Nplots):
 				pl.plot(1e9*time, 1e3*data[channel, frame, :], color='b')
@@ -157,10 +168,8 @@ def parameterDefinition(time, data, command):
 	Mdata = zeroLevelDefinition(data, command['window'])
 
 	return command, data, Mdata
-
-###############################################################################
-###############################################################################
-###############################################################################
+#-----------------------------------------------------------------------------
+# Analysis parameters setting.
 def GetPulse(v, m, sign, ti, tf):
     if max(sign*(v - m)[ti:tf]) > 0:
         i = np.where(max(sign*(v - m)[ti:tf]) == sign*(v - m)[ti:tf])[0][0] + ti
